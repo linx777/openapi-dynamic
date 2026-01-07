@@ -1,0 +1,24 @@
+---
+title: Advanced Features Overview
+description: Sample page for the Advanced Features section.
+---
+
+# Advanced Features
+
+Use this area to document deeper capabilities, flags, and tuning options.
+
+## Highlights
+
+- Lives in `content/docs/advanced-features`.
+- Appears after **Architecture** and before **Strategy Engine** in the sidebar.
+- Keep API references in **Unified REST API**.
+
+## Example snippet
+
+```ts
+type FeatureToggle = 'beta' | 'experimental' | 'stable';
+
+export function isFeatureEnabled(toggle: FeatureToggle) {
+  return toggle !== 'experimental';
+}
+```

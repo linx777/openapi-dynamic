@@ -1,0 +1,24 @@
+---
+title: Strategy Engine Overview
+description: Sample page for the Strategy Engine section.
+---
+
+# Strategy Engine
+
+Document decision logic, orchestration flows, and how strategies are evaluated.
+
+## Highlights
+
+- Lives in `content/docs/strategy-engine`.
+- Appears after **Advanced Features** and before **Unified REST API** in the sidebar.
+- Great place for diagrams, timelines, and execution details.
+
+## Example snippet
+
+```ts
+type StrategyInput = { signal: number; threshold: number };
+
+export function shouldExecute({ signal, threshold }: StrategyInput) {
+  return signal >= threshold;
+}
+```

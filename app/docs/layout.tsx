@@ -13,6 +13,22 @@ export default async function Layout({ children }: LayoutProps<'/docs'>) {
     return typeof node.name === 'string' && node.name.toLowerCase() === 'openapi';
   }
 
+  function isArchitectureFolder(node: any) {
+    return node?.type === 'folder' && typeof node.name === 'string' && node.name.toLowerCase() === 'architecture';
+  }
+
+  function isAdvancedFeaturesFolder(node: any) {
+    return node?.type === 'folder' && typeof node.name === 'string' && node.name.toLowerCase() === 'advanced features';
+  }
+
+  function isStrategyEngineFolder(node: any) {
+    return node?.type === 'folder' && typeof node.name === 'string' && node.name.toLowerCase() === 'strategy engine';
+  }
+
+  function isOverviewFolder(node: any) {
+    return node?.type === 'folder' && typeof node.name === 'string' && node.name.toLowerCase() === 'overview';
+  }
+
   function stripOpenAPI(nodes: any[]): any[] {
     const out: any[] = [];
     for (const node of nodes ?? []) {
@@ -85,13 +101,49 @@ export default async function Layout({ children }: LayoutProps<'/docs'>) {
         }
       : null;
 
-  const groupedTree =
-    unifiedFolder != null
-      ? {
-          ...tree,
-          children: [...stripOpenAPI(tree.children), unifiedFolder],
-        }
-      : tree;
+  const strippedChildren = stripOpenAPI(tree.children ?? []);
+  let architectureFolder: any | null = null;
+  let advancedFeaturesFolder: any | null = null;
+  let strategyEngineFolder: any | null = null;
+  let overviewFromContent: any[] | null = null;
+  const overviewChildren: any[] = [];
+
+  for (const node of strippedChildren) {
+    if (isArchitectureFolder(node)) {
+      architectureFolder = node;
+      continue;
+    }
+    if (isAdvancedFeaturesFolder(node)) {
+      advancedFeaturesFolder = node;
+      continue;
+    }
+    if (isStrategyEngineFolder(node)) {
+      strategyEngineFolder = node;
+      continue;
+    }
+    if (isOverviewFolder(node)) {
+      overviewFromContent = Array.isArray(node.children) ? node.children : [];
+      continue;
+    }
+    overviewChildren.push(node);
+  }
+
+  const overviewFolder = {
+    type: 'folder',
+    name: 'Overview',
+    children: overviewFromContent != null ? [...overviewFromContent, ...overviewChildren] : overviewChildren,
+  };
+
+  const groupedTree = {
+    ...tree,
+    children: [
+      overviewFolder,
+      ...(architectureFolder ? [architectureFolder] : []),
+      ...(advancedFeaturesFolder ? [advancedFeaturesFolder] : []),
+      ...(strategyEngineFolder ? [strategyEngineFolder] : []),
+      ...(unifiedFolder ? [unifiedFolder] : []),
+    ],
+  };
 
   return (
     <DocsLayout tree={groupedTree} {...baseOptions()}>
