@@ -6,6 +6,8 @@ import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { APIPage } from '@/components/api-page';
 
+export const revalidate = 120;
+
 export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   const params = await props.params;
   const source = await getSource();

@@ -5,7 +5,7 @@ import { generate as DefaultImage } from 'fumadocs-ui/og';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export const revalidate = false;
+export const revalidate = 120;
 export const runtime = 'nodejs';
 
 const interRegular = readFile(join(process.cwd(), 'app/fonts/inter/Inter-Regular.ttf'));

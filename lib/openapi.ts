@@ -56,6 +56,7 @@ async function ensureCachedSpec(): Promise<string> {
 
 export const openapi = createOpenAPI({
   // Download the latest spec into .cache/, reusing the cached copy when offline
+  disableCache: true,
   input: async () => ({
     [openapiSpecUrl]: await ensureCachedSpec(),
   }),
