@@ -1,0 +1,664 @@
+openapi: 3.0.3
+info:
+  title: HyperETH Management API
+  description: |
+    HyperETH-specific management and configuration API for API keys, agent wallets, and trade intents.
+
+    **HyperETH-Only Features:**
+    - API key registration, management, and authentication
+    - Agent wallet registration and proxy management
+    - Trade intent processing and execution
+    - User management and authorization
+
+    **Authentication:**
+    Most endpoints require API key authentication. Use the `/v1/api_key/register` endpoint first
+    to obtain an API key, then include it in the `x-api-key` header for subsequent requests.
+
+    **Base URL:**
+    - https://api.hypereth.io
+
+    **Rate Limits:**
+    - API key operations: 10 requests per minute
+    - Agent wallet operations: 20 requests per minute
+    - Trade intent operations: 100 requests per minute
+  version: "1.0.0"
+  contact:
+    name: HyperETH
+    url: https://hypereth.io
+  license:
+    name: MIT
+
+servers:
+  - url: https://api.hypereth.io
+    description: HyperETH Management API
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: |
+        API key for HyperETH authentication.
+        Obtain via POST /v1/api_key/register endpoint.
+
+  schemas:
+    ErrorResponse:
+      type: object
+      description: Standard error response format
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid API key"
+        code:
+          type: integer
+          description: Error code
+          example: 1001
+        details:
+          type: object
+          description: Additional error details
+
+    ApiKeyRequest:
+      type: object
+      description: API key registration request
+      required:
+        - nonce
+        - signature
+      properties:
+        nonce:
+          type: integer
+          description: Nonce in EIP-191 personal sign message, timestamp in milliseconds
+          example: 1758690167820
+        signature:
+          type: string
+          description: 'EIP-191 personal sign of the nonce using the Ethereum wallet. Message format: "HyperETH: API Key Registration\nNonce: {nonce}"'
+          example: "0xea63d2f515f3846a42c9c11a3e74f2000d04d19069dd3072ae1a09b13a9c1d8d171e73e465e16df0c7c66a613c5b64b68cc988fe7907cc1081112ec13b796d2e10"
+
+    ApiKeyResponse:
+      type: object
+      description: API key registration response
+      properties:
+        api_key:
+          type: string
+          description: Generated API key
+          example: "hypereth_1234567890abcdef1234567890abcdef"
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+
+    ApiKeyListRequest:
+      type: object
+      description: API key list request
+      required:
+        - nonce
+        - signature
+      properties:
+        nonce:
+          type: integer
+          description: Nonce in EIP-191 personal sign message, timestamp in milliseconds
+          example: 1758690167820
+        signature:
+          type: string
+          description: 'EIP-191 personal sign of the nonce using the Ethereum wallet. Message format: "HyperETH: List All API Keys\nNonce: {nonce}"'
+          example: "0xea63d2f515f3846a42c9c11a3e74f2000d04d19069dd3072ae1a09b13a9c1d8d171e73e465e16df0c7c66a613c5b64b68cc988fe7907cc1081112ec13b796d2e10"
+
+    ApiKeyListResponse:
+      type: object
+      description: API key list response
+      properties:
+        api_keys:
+          type: array
+          description: List of API keys
+          items:
+            type: object
+            properties:
+              api_key:
+                type: string
+                example: "hypereth_1234567890abcdef1234567890abcdef"
+              name:
+                type: string
+                example: "My Trading Bot Key"
+              is_active:
+                type: boolean
+                example: true
+              created_at:
+                type: string
+                format: date-time
+
+    ApiKeyDeleteRequest:
+      type: object
+      description: Delete API key request
+      required:
+        - api_key_to_delete
+        - nonce
+        - signature
+      properties:
+        api_key_to_delete:
+          type: string
+          description: API key to delete
+          example: "hypereth_1234567890abcdef1234567890abcdef"
+        nonce:
+          type: integer
+          description: Nonce in EIP-191 personal sign message, timestamp in milliseconds
+          example: 1758690167820
+        signature:
+          type: string
+          description: 'EIP-191 personal sign of the nonce using the Ethereum wallet. Message format: "HyperETH: List All API Keys\nNonce: {nonce}"'
+          example: "0xea63d2f515f3846a42c9c11a3e74f2000d04d19069dd3072ae1a09b13a9c1d8d171e73e465e16df0c7c66a613c5b64b68cc988fe7907cc1081112ec13b796d2e10"
+
+    AgentWalletRequest:
+      type: object
+      description: Agent wallet registration request
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Agent wallet alias
+          example: "My Trading Bot Agent Wallet"
+
+    AgentWalletResponse:
+      type: object
+      description: Agent wallet registration response
+      properties:
+        address:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+          description: Registered wallet address
+          example: "0x742d35Cc6634C0532925a3b8D489C8A4c40F8C7B"
+        name:
+          type: string
+          example: "My Trading Bot Agent Wallet"
+        created_at:
+          type: string
+          format: date-time
+
+    AgentWalletListResponse:
+      type: object
+      description: Agent wallet list response
+      properties:
+        agent_wallets:
+          type: array
+          description: List of registered agent wallets
+          items:
+            type: object
+            properties:
+              address:
+                type: string
+                pattern: "^0x[a-fA-F0-9]{40}$"
+                example: "0x742d35Cc6634C0532925a3b8D489C8A4c40F8C7B"
+              name:
+                type: string
+                example: "My Trading Bot Key"
+              is_active:
+                type: boolean
+                example: true
+              created_at:
+                type: string
+                format: date-time
+
+    TradeIntentRequest:
+      type: object
+      description: Trade intent submission
+      required:
+        - nonce
+        - hl_agent_wallet
+        - hl_action
+      properties:
+        nonce:
+          type: integer
+          description: Order intent nonce, should be unique per agent wallet, timestamp in milliseconds
+          example: 1758690167820
+        hl_agent_wallet:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+          description: Agent wallet address to process the intent
+          example: "0x742d35Cc6634C0532925a3b8D489C8A4c40F8C7B"
+        hl_action:
+          type: object
+          description: Hyperliquid action details
+          required:
+            - type
+            - orders
+          properties:
+            type:
+              type: string
+              enum: ["order"]
+              description: Action type
+            orders:
+              type: array
+              description: Orders to place
+              items:
+                type: object
+                required:
+                  - a
+                  - b
+                  - p
+                  - s
+                  - r
+                properties:
+                  a:
+                    type: integer
+                    description: Asset index
+                    example: 0
+                  b:
+                    type: boolean
+                    description: Buy (true) or sell (false)
+                  p:
+                    type: string
+                    description: Limit price
+                    example: "43250.0"
+                  s:
+                    type: string
+                    description: Order size
+                    example: "0.1"
+                  r:
+                    type: boolean
+                    description: Reduce-only flag
+                  t:
+                    type: object
+                    description: Order type specification
+                    properties:
+                      limit:
+                        type: object
+                        properties:
+                          tif:
+                            type: string
+                            enum: ["Alo", "Ioc", "Gtc"]
+                            description: Time in force
+                      trigger:
+                        type: object
+                        properties:
+                          triggerPx:
+                            type: string
+                            description: Trigger price
+                          isMarket:
+                            type: boolean
+                            description: Execute as market order
+                          tpsl:
+                            type: string
+                            enum: ["tp", "sl"]
+                            description: Take profit or stop loss
+                  cloid:
+                    type: string
+                    format: uuid
+                    description: Client order ID (UUID format)
+                    example: "a3b5b1e0-3e7a-4b6c-9c35-cc8f7a0f7c01"
+
+    TradeIntentResponse:
+      type: object
+      description: Trade intent response
+      properties:
+        agg_order_id:
+          type: string
+          description: Unique aggregated order identifier
+          example: "74a29714-a17c-4a97-b782-a1edffe1fe95"
+        intent_hash:
+          type: string
+          description: Intent hash
+          example: "0x96bf2fdf842ae9a277b3cec57b0ad9ad289e09ad629c15adad5569d2e25f3e2a"
+        signer:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+          description: Agent wallet address to process the intent
+          example: "0x742d35Cc6634C0532925a3b8D489C8A4c40F8C7B"
+        hl_response:
+          type: object
+          description: Intent action response from Hyperliquid
+          properties:
+            status:
+              type: string
+              enum: ["ok", "err"]
+              description: Operation status
+            response:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: ["order"]
+                data:
+                  type: object
+                  properties:
+                    statuses:
+                      type: array
+                      description: Status for each order placed
+                      items:
+                        oneOf:
+                          - type: object
+                            properties:
+                              resting:
+                                type: object
+                                properties:
+                                  oid:
+                                    type: integer
+                                    format: int64
+                                    description: Order ID assigned
+                          - type: object
+                            properties:
+                              filled:
+                                type: object
+                                properties:
+                                  totalSz:
+                                    type: string
+                                    description: Total filled size
+                                  avgPx:
+                                    type: string
+                                    description: Average fill price
+                          - type: string
+                            description: Error message if order failed
+
+paths:
+  /v1/api_key/register:
+    post:
+      summary: Register API Key
+      description: |
+        Register a new API key for HyperETH access.
+        This endpoint does not require authentication as it creates the initial API key.
+      tags:
+        - API Key Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiKeyRequest'
+            example:
+              nonce: 1758690167820
+              signature: "0xea63d2f515f3846a42c9c11a3e74f2000d04d19069dd3072ae1a09b13a9c1d8d171e73e465e16df0c7c66a613c5b64b68cc988fe7907cc1081112ec13b796d2e10"
+      responses:
+        '201':
+          description: API key created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: User already has an API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/api_key/list:
+    post:
+      summary: List API Keys
+      description: |
+        List all API keys for the authenticated user.
+        Returns masked API keys with metadata.
+      tags:
+        - API Key Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiKeyListRequest'
+            example:
+              nonce: 1758690167820
+              signature: "0xea63d2f515f3846a42c9c11a3e74f2000d04d19069dd3072ae1a09b13a9c1d8d171e73e465e16df0c7c66a613c5b64b68cc988fe7907cc1081112ec13b796d2e10"
+      responses:
+        '200':
+          description: API keys retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/api_key:
+    delete:
+      summary: Delete API Key
+      description: |
+        Delete an API key and revoke access.
+        This action is irreversible.
+      tags:
+        - API Key Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiKeyDeleteRequest'
+            example:
+              api_key_to_delete: "hypereth_1234567890abcdef1234567890abcdef"
+              nonce: 1758690167820
+              signature: "0xea63d2f515f3846a42c9c11a3e74f2000d04d19069dd3072ae1a09b13a9c1d8d171e73e465e16df0c7c66a613c5b64b68cc988fe7907cc1081112ec13b796d2e10"
+      responses:
+        '200':
+          description: API key deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "API key and associated agent wallets deleted successfully"
+                  agent_wallets_deleted:
+                    type: integer
+                    format: int64
+                    description: Number of agent wallets deleted related to this API key
+                    example: 2
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: API key not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/hl/agent_wallet/register:
+    post:
+      summary: Register Hyperliquid Agent Wallet
+      description: |
+        Register a new agent wallet for automated trading in Hyperliquid.
+        The private key is encrypted and stored securely.
+      tags:
+        - Agent Wallet Management
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentWalletRequest'
+            example:
+              name: "My Trading Bot Agent Wallet"
+      responses:
+        '201':
+          description: Agent wallet registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentWalletResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Wallet already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/hl/agent_wallet:
+    get:
+      summary: List Hyperliquid Agent Wallets
+      description: |
+        List all registered Hyperliquid agent wallets for the authenticated user.
+      tags:
+        - Agent Wallet Management
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Agent wallets retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentWalletListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/hl/agent_wallet/{agent_wallet_address}:
+    delete:
+      summary: Delete Agent Wallet
+      description: |
+        Delete an agent wallet and remove it from the system.
+        This action is irreversible.
+      tags:
+        - Agent Wallet Management
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: agent_wallet_address
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^0x[a-fA-F0-9]{40}$"
+          description: Agent wallet address to delete
+          example: "0x742d35Cc6634C0532925a3b8D489C8A4c40F8C7B"
+      responses:
+        '200':
+          description: Agent wallet deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Agent wallet deleted successfully"
+                  note:
+                    type: string
+                    example: "Remember to remove this agent from your Hyperliquid account via the official interface"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Agent wallet not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/trade/intent:
+    post:
+      summary: Submit Trade Intent
+      description: |
+        Submit a trade intent for processing and execution.
+        The intent will be processed by the specified agent wallet.
+        Pre-requisites:
+          Users must approve our builder code and managed agent wallet using their main wallet.
+      tags:
+        - Trade Intent Processing
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TradeIntentRequest'
+            example:
+              nonce: 1734567890123
+              hl_agent_wallet: "0x742d35Cc6634C0532925a3b8D489C8A4c40F8C7B"
+              hl_action:
+                type: "order"
+                orders:
+                  - a: 0
+                    b: true
+                    p: "43250.0"
+                    s: "0.1"
+                    r: false
+                    t:
+                      limit:
+                        tif: "Gtc"
+                    cloid: "a3b5b1e0-3e7a-4b6c-9c35-cc8f7a0f7c01"
+      responses:
+        '201':
+          description: Trade intent submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradeIntentResponse'
+              example:
+                agg_order_id: "a3b5b1e0-3e7a-4b6c-9c35-cc8f7a0f7c01"
+                intent_hash: "0x7f0f2c1ad3e8b9a5c7d4e2f1b8c9d0e3a6b7c8d9e0f1a2b3c4d5e6f7a8b9c1ad"
+                signer: "0x742d35Cc6634C0532925a3b8D489C8A4c40F8C7B"
+                hl_response:
+                  status: "ok"
+                  response:
+                    type: "order"
+                    data:
+                      statuses:
+                        - resting:
+                            oid: 123456789
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Agent wallet not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: API Key Management
+    description: Operations for managing HyperETH API keys
+  - name: Agent Wallet Management
+    description: Operations for managing trading agent wallets
+  - name: Trade Intent Processing
+    description: Operations for submitting and managing trade intents
