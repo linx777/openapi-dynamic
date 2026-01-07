@@ -4,23 +4,44 @@ import { lucideIconsPlugin } from 'fumadocs-core/source/lucide-icons';
 import { openapiPlugin, openapiSource } from 'fumadocs-openapi/server';
 import { openapi } from '@/lib/openapi';
 
-const openapiPages = await openapiSource(openapi, {
-  baseDir: 'openapi',
-});
+const SOURCE_REVALIDATE_MS = 2 * 60 * 1000; // keep in sync with OpenAPI cache TTL
+export const SOURCE_REVALIDATE_SECONDS = SOURCE_REVALIDATE_MS / 1000;
 
-// See https://fumadocs.dev/docs/headless/source-api for more info
-export const source = loader(
-  multiple({
-    docs: docs.toFumadocsSource(),
-    openapi: openapiPages,
-  }),
-  {
-    baseUrl: '/docs',
-    plugins: [lucideIconsPlugin(), openapiPlugin()],
-  },
-);
+async function createSource() {
+  const openapiPages = await openapiSource(openapi, {
+    baseDir: 'openapi',
+  });
 
-export function getPageImage(page: InferPageType<typeof source>) {
+  // See https://fumadocs.dev/docs/headless/source-api for more info
+  return loader(
+    multiple({
+      docs: docs.toFumadocsSource(),
+      openapi: openapiPages,
+    }),
+    {
+      baseUrl: '/docs',
+      plugins: [lucideIconsPlugin(), openapiPlugin()],
+    },
+  );
+}
+
+type Source = Awaited<ReturnType<typeof createSource>>;
+type Page = InferPageType<Source>;
+
+let cachedSource: Source | null = null;
+let cachedAt = 0;
+
+export async function getSource() {
+  if (cachedSource && Date.now() - cachedAt < SOURCE_REVALIDATE_MS) {
+    return cachedSource;
+  }
+
+  cachedSource = await createSource();
+  cachedAt = Date.now();
+  return cachedSource;
+}
+
+export function getPageImage(page: Page) {
   const segments = [...page.slugs, 'image.png'];
 
   return {
@@ -29,7 +50,7 @@ export function getPageImage(page: InferPageType<typeof source>) {
   };
 }
 
-export async function getLLMText(page: InferPageType<typeof source>) {
+export async function getLLMText(page: Page) {
   if (page.data.type === 'openapi') {
     return JSON.stringify(page.data.getSchema().bundled, null, 2);
   }

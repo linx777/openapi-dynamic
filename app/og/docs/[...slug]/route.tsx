@@ -1,4 +1,4 @@
-import { getPageImage, source } from '@/lib/source';
+import { getPageImage, getSource } from '@/lib/source';
 import { notFound } from 'next/navigation';
 import { ImageResponse } from 'next/og';
 import { generate as DefaultImage } from 'fumadocs-ui/og';
@@ -13,6 +13,7 @@ const interItalic = readFile(join(process.cwd(), 'app/fonts/inter/Inter-Italic.t
 
 export async function GET(_req: Request, { params }: RouteContext<'/og/docs/[...slug]'>) {
   const { slug } = await params;
+  const source = await getSource();
   const page = source.getPage(slug.slice(0, -1));
   if (!page) notFound();
 
@@ -43,8 +44,10 @@ export async function GET(_req: Request, { params }: RouteContext<'/og/docs/[...
 }
 
 export function generateStaticParams() {
-  return source.getPages().map((page) => ({
-    lang: page.locale,
-    slug: getPageImage(page).segments,
-  }));
+  return getSource().then((source) =>
+    source.getPages().map((page) => ({
+      lang: page.locale,
+      slug: getPageImage(page).segments,
+    })),
+  );
 }
