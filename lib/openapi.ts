@@ -1,11 +1,16 @@
 import { createOpenAPI } from 'fumadocs-openapi/server';
 import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 const openapiSpecUrl = 'https://raw.githubusercontent.com/linx777/openapi-sample/main/sample.yaml';
-const cachePath = join(process.cwd(), '.cache', 'openapi-sample.yaml');
+// Use /tmp on Vercel (read-only project dir) and a repo-local cache elsewhere.
+const cacheBaseDir =
+  process.env.OPENAPI_CACHE_DIR ??
+  (process.env.VERCEL ? join(tmpdir(), 'docs-hypereth-openapi') : join(process.cwd(), '.cache'));
+const cachePath = join(cacheBaseDir, 'openapi-sample.yaml');
 const fallbackSpecPath = join(process.cwd(), 'content', 'docs', 'sample.yaml');
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
 async function ensureCachedSpec(): Promise<string> {
   let isFresh = false;
