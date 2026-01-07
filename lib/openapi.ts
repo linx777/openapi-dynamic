@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 const openapiSpecUrl = 'https://raw.githubusercontent.com/linx777/openapi-sample/main/sample.yaml';
 const cachePath = join(process.cwd(), '.cache', 'openapi-sample.yaml');
 const fallbackSpecPath = join(process.cwd(), 'content', 'docs', 'sample.yaml');
-const CACHE_TTL_MS = 2 * 60 * 1000; // 30 minutes
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 async function ensureCachedSpec(): Promise<string> {
   let isFresh = false;
