@@ -1,0 +1,286 @@
+asyncapi: 3.0.0
+info:
+  title: HyperETH Unified WebSocket API
+  version: "1.0.0"
+  description: |
+    Stream market data, trades, and order lifecycle events over WebSockets.
+
+    Authentication is performed with your HyperETH API key; most channels are read-only
+    subscriptions, while a few endpoints accept published commands.
+defaultContentType: application/json
+servers:
+  production:
+    host: ws.hypereth.io/stream
+    protocol: wss
+    description: Live event stream for production traffic.
+  sandbox:
+    host: sandbox-ws.hypereth.io/stream
+    protocol: wss
+    description: Non-production stream for integration testing.
+channels:
+  authSession:
+    address: /auth/session
+    description: Exchange API key credentials for a short-lived streaming session.
+    messages:
+      sessionRequest:
+        $ref: "#/components/messages/SessionRequest"
+      sessionReady:
+        $ref: "#/components/messages/SessionReady"
+  marketTickers:
+    address: /market/tickers
+    description: Streaming best bid/ask and price changes for supported markets.
+    messages:
+      tickerUpdate:
+        $ref: "#/components/messages/TickerUpdate"
+  tradesStream:
+    address: /trades/stream
+    description: Trade fills across all supported markets.
+    messages:
+      tradeFill:
+        $ref: "#/components/messages/TradeFill"
+  orderUpdates:
+    address: /orders/{accountId}
+    description: Order status and execution lifecycle events for a single account.
+    parameters:
+      accountId:
+        description: Unique account identifier
+        schema:
+          type: string
+    messages:
+      orderStatusUpdate:
+        $ref: "#/components/messages/OrderStatusUpdate"
+  orderCommands:
+    address: /orders/commands
+    description: Submit lightweight control messages for orders over the stream.
+    messages:
+      submitOrder:
+        $ref: "#/components/messages/SubmitOrder"
+operations:
+  sendSessionRequest:
+    action: send
+    channel:
+      $ref: "#/channels/authSession"
+    summary: Start an authenticated session
+    messages:
+      - $ref: "#/channels/authSession/messages/sessionRequest"
+  receiveSessionReady:
+    action: receive
+    channel:
+      $ref: "#/channels/authSession"
+    summary: Session handshake response
+    messages:
+      - $ref: "#/channels/authSession/messages/sessionReady"
+  receiveTickerUpdates:
+    action: receive
+    channel:
+      $ref: "#/channels/marketTickers"
+    summary: Subscribe to ticker snapshots and updates
+    messages:
+      - $ref: "#/channels/marketTickers/messages/tickerUpdate"
+  receiveTradeFills:
+    action: receive
+    channel:
+      $ref: "#/channels/tradesStream"
+    summary: Subscribe to trade fill stream
+    messages:
+      - $ref: "#/channels/tradesStream/messages/tradeFill"
+  receiveOrderUpdates:
+    action: receive
+    channel:
+      $ref: "#/channels/orderUpdates"
+    summary: Subscribe to order updates for an account
+    messages:
+      - $ref: "#/channels/orderUpdates/messages/orderStatusUpdate"
+  sendOrderCommands:
+    action: send
+    channel:
+      $ref: "#/channels/orderCommands"
+    summary: Send order control commands
+    messages:
+      - $ref: "#/channels/orderCommands/messages/submitOrder"
+components:
+  messages:
+    SessionRequest:
+      name: SessionRequest
+      summary: Authenticate using an API key and nonce
+      payload:
+        type: object
+        required:
+          - apiKey
+          - nonce
+          - signature
+        properties:
+          apiKey:
+            type: string
+            description: HyperETH API key value.
+            example: "live_ck3eb0w1r0000abc123"
+          nonce:
+            type: integer
+            description: Millisecond timestamp used for request freshness.
+            example: 1758690167820
+          signature:
+            type: string
+            description: Hex-encoded EIP-191 signature of the nonce.
+    SessionReady:
+      name: SessionReady
+      summary: Session established
+      payload:
+        type: object
+        required:
+          - sessionId
+          - expiresAt
+        properties:
+          sessionId:
+            type: string
+            description: Short-lived session token for subsequent channel subscriptions.
+            example: "sess_c92cd3e1-24e0-4127-9d06-5164d91d79a1"
+          expiresAt:
+            type: string
+            format: date-time
+            description: Expiration timestamp for the session token.
+    TickerUpdate:
+      name: TickerUpdate
+      summary: Real-time ticker snapshot
+      payload:
+        type: object
+        properties:
+          symbol:
+            type: string
+            description: Trading pair symbol.
+            example: ETH-USD
+          price:
+            type: number
+            format: double
+            description: Last traded price.
+            example: 3525.42
+          change24h:
+            type: number
+            format: double
+            description: Percent change over the last 24h.
+            example: -0.84
+          bestBid:
+            type: number
+            format: double
+            description: Best bid price.
+            example: 3525.12
+          bestAsk:
+            type: number
+            format: double
+            description: Best ask price.
+            example: 3525.68
+          ts:
+            type: string
+            format: date-time
+            description: Event timestamp in RFC 3339 format.
+    TradeFill:
+      name: TradeFill
+      summary: Individual trade fill
+      payload:
+        type: object
+        required:
+          - tradeId
+          - symbol
+          - side
+          - price
+          - size
+          - filledAt
+        properties:
+          tradeId:
+            type: string
+            example: "fill_9025ba28-5a75-4ca6-b6c9-54a77bed0cc9"
+          orderId:
+            type: string
+            description: Order that produced the fill, if available.
+            example: "ord_001"
+          symbol:
+            type: string
+            example: ETH-USD
+          side:
+            type: string
+            enum:
+              - buy
+              - sell
+            example: buy
+          price:
+            type: number
+            format: double
+            example: 3525.1
+          size:
+            type: number
+            format: double
+            example: 0.42
+          filledAt:
+            type: string
+            format: date-time
+            example: "2024-05-01T12:01:00.000Z"
+    OrderStatusUpdate:
+      name: OrderStatusUpdate
+      summary: Order lifecycle update
+      payload:
+        type: object
+        required:
+          - orderId
+          - status
+        properties:
+          orderId:
+            type: string
+            example: "ord_001"
+          status:
+            type: string
+            description: Lifecycle status for the order.
+            enum:
+              - pending
+              - open
+              - filled
+              - partially_filled
+              - canceled
+              - rejected
+            example: partially_filled
+          filledSize:
+            type: number
+            format: double
+            description: Filled size so far.
+            example: 0.21
+          reason:
+            type: string
+            description: Optional reason for cancellation or rejection.
+    SubmitOrder:
+      name: SubmitOrder
+      summary: Submit or cancel an order from the stream
+      payload:
+        type: object
+        required:
+          - action
+          - symbol
+          - side
+        properties:
+          action:
+            type: string
+            enum:
+              - create
+              - cancel
+            description: Create a new order or cancel an existing one.
+            example: create
+          orderId:
+            type: string
+            description: Required when canceling an existing order.
+            example: "ord_001"
+          symbol:
+            type: string
+            example: ETH-USD
+          side:
+            type: string
+            enum:
+              - buy
+              - sell
+            example: buy
+          size:
+            type: number
+            format: double
+            description: Desired size when creating an order.
+            example: 0.5
+          limitPrice:
+            type: number
+            format: double
+            description: Limit price for limit orders.
+            example: 3524.5

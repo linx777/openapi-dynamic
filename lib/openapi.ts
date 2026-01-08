@@ -4,14 +4,17 @@ import { createSign } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-const openapiSpecUrl = 'https://raw.githubusercontent.com/linx777/openapi-sample/main/sample.yaml';
+const repoOwner = process.env.OPENAPI_REPO_OWNER ?? 'linx777';
+const repoName = process.env.OPENAPI_REPO_NAME ?? 'openapi-sample';
+const repoPath = process.env.OPENAPI_REPO_PATH ?? 'sample.yaml';
+const openapiSpecUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${repoPath}`;
 // Use /tmp on Vercel (read-only project dir) and a repo-local cache elsewhere.
 const cacheBaseDir =
   process.env.OPENAPI_CACHE_DIR ??
   (process.env.VERCEL ? join(tmpdir(), 'docs-hypereth-openapi') : join(process.cwd(), '.cache'));
 const cachePath = join(cacheBaseDir, 'openapi-sample.yaml');
 const fallbackSpecPath = join(process.cwd(), 'content', 'docs', 'sample.yaml');
-const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const CACHE_TTL_MS = Number(process.env.OPENAPI_CACHE_TTL_MS ?? 2 * 60 * 1000); // 2 minutes by default
 const GITHUB_APP_ID = process.env.GITHUB_APP_ID;
 const GITHUB_APP_INSTALLATION_ID = process.env.GITHUB_APP_INSTALLATION_ID;
 const GITHUB_APP_PRIVATE_KEY = process.env.GITHUB_APP_PRIVATE_KEY;
@@ -63,52 +66,78 @@ async function createGitHubAppToken() {
   return json.token ?? null;
 }
 
+async function fetchAndCacheSpec(token: string | null) {
+  const hasAuth = Boolean(token);
+  console.info(`[openapi] Fetching spec from ${openapiSpecUrl} (auth: ${hasAuth ? 'github-app' : 'none'})`);
+  const res = await fetch(openapiSpecUrl, {
+    cache: 'no-store',
+    headers: token
+      ? { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+      : { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+  });
+  console.info(`[openapi] Fetch status: ${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(`Failed to fetch OpenAPI spec: ${res.status} ${res.statusText}`);
+
+  const json = (await res.json()) as { content?: string; encoding?: string };
+  if (!json.content || json.encoding !== 'base64') {
+    throw new Error('Failed to fetch OpenAPI spec: unexpected GitHub content response');
+  }
+
+  const yaml = Buffer.from(json.content, 'base64').toString('utf8');
+  await mkdir(dirname(cachePath), { recursive: true });
+  await writeFile(cachePath, yaml, 'utf8');
+  console.info('[openapi] Spec cached successfully');
+}
+
 async function ensureCachedSpec(): Promise<string> {
   let isFresh = false;
+  let hasCached = false;
 
   try {
     const file = await stat(cachePath);
+    hasCached = true;
     isFresh = Date.now() - file.mtimeMs < CACHE_TTL_MS;
   } catch {
     isFresh = false;
   }
 
-  if (!isFresh) {
-    const token = await createGitHubAppToken();
-    const hasAuth = Boolean(token);
-    console.info(`[openapi] Fetching spec from ${openapiSpecUrl} (auth: ${hasAuth ? 'github-app' : 'none'})`);
-    try {
-      const res = await fetch(openapiSpecUrl, {
-        cache: 'no-store',
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      console.info(`[openapi] Fetch status: ${res.status} ${res.statusText}`);
-      if (!res.ok) throw new Error(`Failed to fetch OpenAPI spec: ${res.status} ${res.statusText}`);
+  if (isFresh) {
+    return cachePath;
+  }
 
-      const yaml = await res.text();
+  const token = await createGitHubAppToken();
+
+  // If we have a stale cached copy, serve it immediately and refresh in background
+  if (hasCached) {
+    fetchAndCacheSpec(token).catch((error) => {
+      console.warn(
+        '[openapi] Background refresh failed, keeping stale cache',
+        error instanceof Error ? error.message : error,
+      );
+    });
+    console.info('[openapi] Serving stale cached spec while refreshing in background');
+    return cachePath;
+  }
+
+  // No cache available: must fetch or fall back
+  try {
+    await fetchAndCacheSpec(token);
+    return cachePath;
+  } catch (error) {
+    console.warn(
+      '[openapi] Initial fetch failed, trying local fallback',
+      error instanceof Error ? error.message : error,
+    );
+    try {
+      const fallback = await readFile(fallbackSpecPath, 'utf8');
       await mkdir(dirname(cachePath), { recursive: true });
-      await writeFile(cachePath, yaml, 'utf8');
-      isFresh = true;
-      console.info('[openapi] Spec cached successfully');
-    } catch (error) {
-      console.warn('[openapi] Fetch failed, trying cache/local fallback', error instanceof Error ? error.message : error);
-      // If network fails, fall back to last cached copy (if it exists)
-      try {
-        await readFile(cachePath, 'utf8');
-        console.info('[openapi] Using previously cached spec');
-      } catch {
-        // As a final fallback, use the bundled local spec and seed the cache with it
-        try {
-          const fallback = await readFile(fallbackSpecPath, 'utf8');
-          await mkdir(dirname(cachePath), { recursive: true });
-          await writeFile(cachePath, fallback, 'utf8');
-          console.info('[openapi] Seeded cache from local fallback spec');
-        } catch {
-          throw new Error('Failed to download OpenAPI spec and no cached copy is available', {
-            cause: error,
-          });
-        }
-      }
+      await writeFile(cachePath, fallback, 'utf8');
+      console.info('[openapi] Seeded cache from local fallback spec');
+      return cachePath;
+    } catch {
+      throw new Error('Failed to download OpenAPI spec and no cached copy is available', {
+        cause: error,
+      });
     }
   }
 

@@ -7,6 +7,7 @@ export default async function Layout({ children }: LayoutProps<'/docs'>) {
   const tree: any = source.getPageTree();
 
   const openapiPrefix = '/docs/openapi/';
+  const websocketPrefix = '/docs/unified-websocket-api';
 
   // Strip existing OpenAPI nodes from the tree
   function isOpenApiFolder(node: any) {
@@ -27,6 +28,14 @@ export default async function Layout({ children }: LayoutProps<'/docs'>) {
 
   function isOverviewFolder(node: any) {
     return node?.type === 'folder' && typeof node.name === 'string' && node.name.toLowerCase() === 'overview';
+  }
+
+  function isWebsocketFolder(node: any) {
+    return node?.type === 'folder' && typeof node.name === 'string' && node.name.toLowerCase() === 'unified websocket api';
+  }
+
+  function isWebsocketPage(node: any) {
+    return node?.type === 'page' && typeof node.url === 'string' && node.url.startsWith(websocketPrefix);
   }
 
   function stripOpenAPI(nodes: any[]): any[] {
@@ -107,6 +116,7 @@ export default async function Layout({ children }: LayoutProps<'/docs'>) {
   let strategyEngineFolder: any | null = null;
   let overviewFromContent: any[] | null = null;
   const overviewChildren: any[] = [];
+  const websocketNodes: any[] = [];
 
   for (const node of strippedChildren) {
     if (isArchitectureFolder(node)) {
@@ -125,6 +135,14 @@ export default async function Layout({ children }: LayoutProps<'/docs'>) {
       overviewFromContent = Array.isArray(node.children) ? node.children : [];
       continue;
     }
+    if (isWebsocketFolder(node)) {
+      websocketNodes.push(node);
+      continue;
+    }
+    if (isWebsocketPage(node)) {
+      websocketNodes.push(node);
+      continue;
+    }
     overviewChildren.push(node);
   }
 
@@ -134,6 +152,19 @@ export default async function Layout({ children }: LayoutProps<'/docs'>) {
     children: overviewFromContent != null ? [...overviewFromContent, ...overviewChildren] : overviewChildren,
   };
 
+  const websocketChildren = websocketNodes.flatMap((node) =>
+    node?.type === 'folder' && Array.isArray(node.children) ? node.children : [node],
+  );
+
+  const websocketFolder =
+    websocketChildren.length > 0
+      ? {
+          type: 'folder',
+          name: 'Unified WebSocket API',
+          children: websocketChildren,
+        }
+      : null;
+
   const groupedTree = {
     ...tree,
     children: [
@@ -142,6 +173,7 @@ export default async function Layout({ children }: LayoutProps<'/docs'>) {
       ...(advancedFeaturesFolder ? [advancedFeaturesFolder] : []),
       ...(strategyEngineFolder ? [strategyEngineFolder] : []),
       ...(unifiedFolder ? [unifiedFolder] : []),
+      ...(websocketFolder ? [websocketFolder] : []),
     ],
   };
 

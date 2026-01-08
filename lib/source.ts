@@ -4,8 +4,10 @@ import { lucideIconsPlugin } from 'fumadocs-core/source/lucide-icons';
 import { openapiPlugin, openapiSource } from 'fumadocs-openapi/server';
 import { openapi } from '@/lib/openapi';
 
-const SOURCE_REVALIDATE_MS = 2 * 60 * 1000; // keep in sync with OpenAPI cache TTL
-export const SOURCE_REVALIDATE_SECONDS = SOURCE_REVALIDATE_MS / 1000;
+const SOURCE_REVALIDATE_MS_RAW = Number(process.env.SOURCE_REVALIDATE_MS ?? 2 * 60 * 1000);
+const SOURCE_REVALIDATE_MS = Number.isFinite(SOURCE_REVALIDATE_MS_RAW) ? SOURCE_REVALIDATE_MS_RAW : 2 * 60 * 1000;
+export const SOURCE_REVALIDATE_SECONDS: number | false =
+  SOURCE_REVALIDATE_MS > 0 ? SOURCE_REVALIDATE_MS / 1000 : false;
 
 async function createSource() {
   const openapiPages = await openapiSource(openapi, {

@@ -6,7 +6,9 @@ import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { APIPage } from '@/components/api-page';
 
-export const revalidate = 120;
+// Disable Next.js route cache so OpenAPI/doc changes are picked up without restart.
+export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   const params = await props.params;
